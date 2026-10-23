@@ -56,6 +56,42 @@ netaudit-agent -i eth0 -f "tcp" -o /var/log/netaudit.jsonl
 {"type":"stats","packets":33,"tcp_segments":33,"flows":3,"delivered_bytes":1229,"retransmitted_bytes":0,"out_of_order_segments":0,"gap_events":0,"events":3}
 ```
 
+## 테스트 실행과 보고서
+
+Windows에서는 Docker Desktop만 켜져 있으면 아래 명령 하나로 전체 테스트가 돌아갑니다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run_tests.ps1
+```
+
+[`tools/run_tests.sh`](tools/run_tests.sh)가 컨테이너 안에서 세 단계를 차례로 실행합니다.
+
+1. **빌드**: Debug + AddressSanitizer/UBSan
+2. **단위 테스트**: GoogleTest 45개. 결과는 `test-results/unit.xml`에 저장
+3. **End-to-End**: Python HTTP 서버를 띄우고 요청 5개(GET, 약 67KB 응답, 404, HEAD, POST)를 보내는 동안 `tcpdump`로 루프백을 캡처합니다. 그 pcap을 `netaudit-agent -r`로 분석해서, 클라이언트가 받은 응답과 에이전트가 기록한 결과를 나란히 출력합니다.
+
+마지막으로 [`tools/make_report.py`](tools/make_report.py)가 결과를 모아 `test-results/report.html`을 만듭니다. 보고서에는 테스트마다 무엇을 확인하는지 설명이 붙어 있고, 실제 트래픽 분석 결과와 처리 통계도 함께 들어갑니다. `test-results/`는 git에서 제외됩니다.
+
+실행 결과 예시:
+
+```
+==== [3/3] End-to-end: capture real HTTP traffic on loopback, then analyse it ====
+-> sending requests to 127.0.0.1:8080
+   GET  /index.html            -> 200 (6 bytes)
+   GET  /big.txt               -> 200 (67546 bytes)
+   GET  /missing?id=42         -> 404 (335 bytes)
+   HEAD /index.html            -> 200 (0 bytes)
+   POST /upload                -> 501 (357 bytes)
+-> netaudit-agent -r e2e.pcap
+   METHOD URI                    STATUS RESP BYTES  FLAGS
+   GET    /index.html               200          6
+   GET    /big.txt                  200      67546
+   GET    /missing?id=42            404        335
+   HEAD   /index.html               200          0
+   POST   /upload                   501        357
+   packets=64 flows=5 delivered_bytes=69649 gaps=0 events=5
+```
+
 ## 테스트 범위
 
 | 영역 | 확인 내용 |
