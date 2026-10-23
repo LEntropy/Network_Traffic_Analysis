@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Traffic Agent Tester</title>
+<style>
+:root {
+  --bg: #f5f6f8; --card: #ffffff; --text: #1c2230; --muted: #5f6878; --line: #e2e5ea;
+  --accent: #2c5cc5; --accent-text: #ffffff; --accent-soft: #e8eefb;
+  --ok: #1a7f4b; --ok-soft: #e4f4ea; --warn: #a15c00; --warn-soft: #fdf1dc;
+  --bad: #b42318; --bad-soft: #fdeceb; --code-bg: #f1f3f6; --hl: #fff7d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101317; --card: #181c22; --text: #e5e8ed; --muted: #98a1ae; --line: #2a3038;
+    --accent: #7aa2f7; --accent-text: #0d1117; --accent-soft: #1c2740;
+    --ok: #4cc38a; --ok-soft: #14301f; --warn: #e0a54b; --warn-soft: #33270f;
+    --bad: #ff7b72; --bad-soft: #3a1a18; --code-bg: #11151a; --hl: #2c2a17;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.5 -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--card);
+  position: sticky; top: 0; z-index: 2; flex-wrap: wrap; }
+header h1 { font-size: 17px; margin: 0; }
+header .sub { color: var(--muted); font-size: 13px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; background: var(--bad-soft); color: var(--bad); }
+.pill.on { background: var(--ok-soft); color: var(--ok); }
+.pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px;
+  padding: 16px 20px 40px; max-width: 1400px; margin: 0 auto; }
+@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); padding: 12px 16px 32px; } }
+.col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.card h2 { font-size: 14px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+.step { display: inline-flex; width: 20px; height: 20px; border-radius: 50%; align-items: center;
+  justify-content: center; background: var(--accent); color: var(--accent-text); font-size: 12px; }
+.presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.preset { text-align: left; border: 1px solid var(--line); background: var(--card); color: var(--text);
+  border-radius: 8px; padding: 8px 10px; cursor: pointer; font: inherit; }
+.preset:hover { border-color: var(--accent); }
+.preset.active { border-color: var(--accent); background: var(--accent-soft); }
+.preset b { display: block; font-size: 13px; }
+.preset span { color: var(--muted); font-size: 12px; }
+.hint { color: var(--muted); font-size: 12.5px; margin: 10px 0 0; }
+.hint.box { background: var(--accent-soft); color: var(--text); padding: 8px 10px; border-radius: 6px; }
+.row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.row > * { min-width: 0; }
+label.f { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+input, select, textarea { font: inherit; color: var(--text); background: var(--card);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; }
+textarea { font: 12.5px/1.45 ui-monospace, Consolas, monospace; resize: vertical; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+.mono { font-family: ui-monospace, Consolas, monospace; }
+.inline { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); }
+.inline input { width: auto; }
+button.primary { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
+  padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+button.primary:disabled { opacity: .6; cursor: wait; }
+button.ghost { background: none; border: 1px solid var(--line); color: var(--text); border-radius: 6px;
+  padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.sendbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.meta { color: var(--muted); font-size: 12.5px; }
+pre { margin: 0; background: var(--code-bg); border-radius: 6px; padding: 10px; overflow: auto;
+  max-height: 340px; font: 12px/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-all; }
+.empty { color: var(--muted); text-align: center; padding: 22px 8px; }
+.event { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+.event .top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.event .line { font-family: ui-monospace, Consolas, monospace; font-weight: 600; word-break: break-all; }
+.status { font-weight: 700; padding: 1px 8px; border-radius: 999px; font-size: 12px; }
+.s2 { background: var(--ok-soft); color: var(--ok); } .s3 { background: var(--accent-soft); color: var(--accent); }
+.s4, .s0 { background: var(--warn-soft); color: var(--warn); } .s5 { background: var(--bad-soft); color: var(--bad); }
+.s1 { background: var(--accent-soft); color: var(--accent); }
+dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 12px; margin: 0; font-size: 13px; }
+dt { color: var(--muted); } dd { margin: 0; word-break: break-all; }
+.flags { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.flag { background: var(--warn-soft); border-radius: 6px; padding: 6px 10px; font-size: 12.5px; }
+.flag.bad { background: var(--bad-soft); }
+.flag code { font-weight: 700; }
+.waiting { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.spin { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 11.5px; }
+tbody tr { cursor: pointer; } tbody tr:hover { background: var(--code-bg); }
+tr.mine { background: var(--hl); }
+td.uri { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.compare div { background: var(--code-bg); border-radius: 6px; padding: 8px 10px; }
+.compare b { display: block; font-size: 18px; }
+.compare span { color: var(--muted); font-size: 12px; }
+.match { font-size: 12.5px; font-weight: 600; margin-bottom: 10px; }
+.match.ok { color: var(--ok); } .match.no { color: var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Network_Traffic_Analysis 테스트 클라이언트</h1>
+    <div class="sub">요청을 보내면 netaudit-agent가 같은 트래픽을 패킷으로 캡처해 분석한 결과를 바로 보여줍니다.</div>
+  </div>
+  <span id="agent" class="pill">에이전트 확인 중</span>
+</header>
+
+<main>
+  <section class="col">
+    <div class="card">
+      <h2><span class="step">1</span>시나리오 선택</h2>
+      <div class="presets" id="presets"></div>
+      <p class="hint box" id="presetHint">시나리오를 고르면 아래 요청이 채워집니다. 직접 수정해서 보내도 됩니다.</p>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">2</span>요청 만들기</h2>
+      <div class="row">
+        <select id="method" style="flex:0 0 120px">
+          <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
+          <option>HEAD</option><option>OPTIONS</option><option>PATCH</option>
+        </select>
+        <input id="path" class="mono" style="flex:1" value="/">
+      </div>
+      <label class="f" for="headers">헤더 (한 줄에 하나, Host는 자동 추가)</label>
+      <textarea id="headers" rows="3" placeholder="User-Agent: netaudit-demo"></textarea>
+      <label class="f" for="body">본문</label>
+      <textarea id="body" rows="3" placeholder="POST/PUT 본문"></textarea>
+      <div class="row" style="margin-top:8px">
+        <label class="f" for="framing" style="margin:0;align-self:center">본문 전송 방식</label>
+        <select id="framing" style="flex:0 0 240px">
+          <option value="length">Content-Length</option>
+          <option value="chunked">Transfer-Encoding: chunked</option>
+        </select>
+      </div>
+
+      <label class="f" for="raw">실제로 전송될 바이트 (직접 편집 가능, 줄바꿈은 CRLF로 변환)</label>
+      <textarea id="raw" rows="9" spellcheck="false"></textarea>
+      <div class="row" style="justify-content:space-between;margin-top:6px">
+        <span class="meta" id="rawInfo"></span>
+        <button class="ghost" id="regen" type="button">위 입력으로 다시 만들기</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">3</span>전송 방식</h2>
+      <div class="row">
+        <div style="flex:1 1 200px">
+          <label class="f" for="segment">TCP 세그먼트 크기</label>
+          <select id="segment">
+            <option value="0">한 번에 보내기</option>
+            <option value="1">1바이트씩 (최대 분할)</option>
+            <option value="5">5바이트씩</option>
+            <option value="16">16바이트씩</option>
+            <option value="64">64바이트씩</option>
+          </select>
+        </div>
+        <div style="flex:1 1 140px">
+          <label class="f" for="delay">세그먼트 간격 (ms)</label>
+          <input id="delay" type="number" min="0" max="200" value="0">
+        </div>
+      </div>
+      <p class="hint">요청을 잘게 나눠 보내면 에이전트가 여러 패킷을 이어 붙여(TCP 재조립) 하나의 요청으로 복원하는지 확인할 수 있습니다.</p>
+      <div class="sendbar">
+        <button class="primary" id="send" type="button">요청 보내기</button>
+        <span class="meta" id="sendInfo"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="col">
+    <div class="card">
+      <h2>에이전트 분석 결과 (이번 요청)</h2>
+      <div id="result"><div class="empty">아직 보낸 요청이 없습니다.</div></div>
+    </div>
+
+    <div class="card">
+      <h2>클라이언트가 받은 응답 원본</h2>
+      <div id="responseMeta" class="meta" style="margin-bottom:8px"></div>
+      <pre id="response">-</pre>
+    </div>
+
+    <div class="card">
+      <h2 style="justify-content:space-between">
+        <span>실시간 이벤트 로그 <span class="meta" id="count"></span></span>
+      </h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>시각</th><th>Port</th><th>Method</th><th>URI</th><th class="num">Status</th>
+            <th class="num">응답 바이트</th><th>Flags</th></tr></thead>
+          <tbody id="log"><tr><td colspan="7" class="empty">이벤트가 없습니다.</td></tr></tbody>
+        </table>
+      </div>
+      <pre id="detail" style="margin-top:10px;display:none"></pre>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const enc = new TextEncoder();
+
+const FLAG_INFO = {
+  cl_te_conflict: ["Content-Length와 Transfer-Encoding을 함께 사용했습니다. 서버와 프록시가 본문 길이를 다르게 해석할 수 있는 요청 스머글링 징후입니다. (RFC 9112에 따라 chunked를 우선 적용)", true],
+  conflicting_content_length: ["서로 다른 Content-Length가 여러 개 있습니다. 본문 경계를 신뢰할 수 없어 이 연결의 파싱을 중단했습니다.", true],
+  bad_header_name: ["헤더 이름에 공백 등 허용되지 않는 문자가 있습니다. (예: \"Content-Length : 5\")", true],
+  obs_fold: ["폐기된 헤더 줄 접기(obs-fold)를 사용했습니다.", false],
+  bare_lf: ["CRLF 대신 LF만으로 줄을 끝냈습니다.", false],
+  no_response: ["요청에 대한 응답을 받지 못한 채 연결이 끝났습니다.", false],
+  incomplete: ["메시지가 끝나기 전에 연결이 끊겼습니다.", false],
+  gap: ["캡처되지 않은 구간(갭) 때문에 파싱을 중단했습니다.", true],
+  body_gap: ["본문 일부가 캡처되지 않았지만 메시지 경계는 유지했습니다.", false],
+  orphan_response: ["대응하는 요청 없이 응답만 관측했습니다.", false],
+  midstream: ["연결 시작(3-way 핸드셰이크)을 보지 못하고 중간부터 추적했습니다.", false],
+  not_http: ["HTTP 형식이 아닌 데이터라 파싱을 중단했습니다.", false],
+  header_too_large: ["헤더가 64KB를 넘어 파싱을 중단했습니다.", true],
+  unanswered: ["대기 중인 요청이 너무 많아 오래된 요청을 먼저 기록했습니다.", false],
+};
+
+const HOST = "Host: 127.0.0.1:8080";
+const PRESETS = [
+  { id: "get", title: "기본 GET", desc: "가장 단순한 요청과 응답",
+    hint: "요청 1개와 200 응답이 그대로 기록되는지 확인합니다.",
+    form: { method: "GET", path: "/", headers: "User-Agent: netaudit-demo" } },
+  { id: "big", title: "큰 응답 (256KB)", desc: "수백 개 패킷 재조립",
+    hint: "256KB 응답은 수많은 TCP 세그먼트로 나뉘어 옵니다. 에이전트가 기록한 응답 바이트가 클라이언트가 받은 본문 크기와 같은지 비교해 보세요.",
+    form: { method: "GET", path: "/big?kb=256", headers: "User-Agent: netaudit-demo" } },
+  { id: "chunked", title: "chunked 응답", desc: "Transfer-Encoding 해석",
+    hint: "서버가 길이를 미리 알리지 않고 조각(chunk)으로 보내는 응답입니다. 조각 헤더를 뺀 실제 본문 길이를 계산하는지 확인합니다.",
+    form: { method: "GET", path: "/chunked?n=8", headers: "User-Agent: netaudit-demo" } },
+  { id: "404", title: "404 Not Found", desc: "오류 응답 기록",
+    hint: "존재하지 않는 경로입니다. 상태 코드 404가 기록됩니다.",
+    form: { method: "GET", path: "/admin/login.php?user=test", headers: "User-Agent: netaudit-demo" } },
+  { id: "head", title: "HEAD 요청", desc: "본문 없는 응답 규칙",
+    hint: "HEAD 응답에는 Content-Length가 있어도 본문이 없습니다. 에이전트가 본문을 기다리지 않고 0바이트로 기록해야 합니다.",
+    form: { method: "HEAD", path: "/big?kb=64", headers: "User-Agent: netaudit-demo" } },
+  { id: "post", title: "POST 폼 (한글)", desc: "요청 본문과 UTF-8",
+    hint: "한글이 포함된 폼 데이터입니다. 요청 본문 바이트 수는 글자 수가 아니라 UTF-8 바이트 수로 계산됩니다.",
+    form: { method: "POST", path: "/echo", headers: "Content-Type: application/x-www-form-urlencoded",
+            body: "name=홍길동&memo=개인정보 테스트" } },
+  { id: "chunkedup", title: "chunked 업로드", desc: "요청 쪽 chunked",
+    hint: "요청 본문을 chunked로 보냅니다. 요청 쪽에서도 조각을 해석하는지 확인합니다.",
+    form: { method: "POST", path: "/echo", headers: "Content-Type: text/plain", body: "chunked request body", framing: "chunked" } },
+  { id: "pipeline", title: "파이프라이닝 3건", desc: "한 연결에 요청 여러 개",
+    hint: "응답을 기다리지 않고 요청 3개를 한 번에 보냅니다. 에이전트가 응답을 순서대로 짝지어 이벤트 3개를 남기는지 확인하세요.",
+    raw: `GET /status/200 HTTP/1.1\n${HOST}\n\nGET /status/404 HTTP/1.1\n${HOST}\n\nGET /big?kb=4 HTTP/1.1\n${HOST}\n\n` },
+  { id: "bytewise", title: "1바이트씩 전송", desc: "극단적인 패킷 분할",
+    hint: "요청을 1바이트짜리 TCP 세그먼트 수십 개로 쪼개 보냅니다. 그래도 하나의 요청으로 복원되는지 확인합니다.",
+    form: { method: "GET", path: "/echo?split=1", headers: "User-Agent: byte-by-byte" }, segment: 1 },
+  { id: "smuggle", title: "스머글링: CL + TE", desc: "보안 이상 징후 탐지",
+    hint: "Content-Length와 Transfer-Encoding을 동시에 넣은 요청입니다. 에이전트가 cl_te_conflict 플래그로 표시합니다.",
+    raw: `POST /echo HTTP/1.1\n${HOST}\nContent-Length: 5\nTransfer-Encoding: chunked\n\n0\n\n` },
+  { id: "dupcl", title: "스머글링: CL 중복", desc: "서로 다른 길이 두 개",
+    hint: "Content-Length가 4와 5 두 개입니다. 본문 경계를 믿을 수 없으므로 에이전트가 파싱을 멈추고 이유를 기록합니다.",
+    raw: `POST /echo HTTP/1.1\n${HOST}\nContent-Length: 4\nContent-Length: 5\n\nabcde` },
+  { id: "upgrade", title: "WebSocket 업그레이드", desc: "101 이후 프로토콜 전환",
+    hint: "101 Switching Protocols 이후는 HTTP가 아니므로 에이전트가 그 지점에서 해석을 멈춥니다.",
+    form: { method: "GET", path: "/upgrade", headers: "Upgrade: websocket\nConnection: Upgrade" } },
+  { id: "nonhttp", title: "HTTP가 아닌 데이터", desc: "프로토콜 판별",
+    hint: "HTTP가 아닌 바이트를 보냅니다. 에이전트는 포트가 아닌 내용으로 프로토콜을 판별하므로 아무 이벤트도 남기지 않아야 합니다.",
+    raw: "HELLO SERVER, THIS IS NOT HTTP\n" },
+];
+
+let activePreset = null;
+let allEvents = [];
+let nextIndex = 0;
+let current = null;  // { port, sentAt, expectHttp }
+
+function toCrlf(s) { return s.replace(/\r?\n/g, "\r\n"); }
+function byteLen(s) { return enc.encode(s).length; }
+
+function buildRaw() {
+  const method = $("method").value;
+  const path = $("path").value.trim() || "/";
+  const headers = $("headers").value.split("\n").map((l) => l.trim()).filter(Boolean)
+    .filter((l) => !/^host\s*:/i.test(l));
+  const body = toCrlf($("body").value);
+  const lines = [`${method} ${path} HTTP/1.1`, HOST, ...headers];
+  let payload = "";
+  if (body.length > 0 || ["POST", "PUT", "PATCH"].includes(method)) {
+    if ($("framing").value === "chunked") {
+      lines.push("Transfer-Encoding: chunked");
+      payload = body.length ? `${byteLen(body).toString(16)}\n${body}\n0\n\n` : "0\n\n";
+    } else {
+      lines.push(`Content-Length: ${byteLen(body)}`);
+      payload = body;
+    }
+  }
+  return lines.join("\n") + "\n\n" + payload;
+}
+
+function regen() { $("raw").value = buildRaw(); updateRawInfo(); }
+
+function updateRawInfo() {
+  const bytes = byteLen(toCrlf($("raw").value));
+  const seg = Number($("segment").value);
+  const segs = seg > 0 ? Math.ceil(bytes / seg) : 1;
+  $("rawInfo").textContent = `${bytes.toLocaleString()} 바이트 · TCP 세그먼트 약 ${segs.toLocaleString()}개로 전송`;
+}
+
+function applyPreset(p) {
+  activePreset = p;
+  document.querySelectorAll(".preset").forEach((b) => b.classList.toggle("active", b.dataset.id === p.id));
+  $("presetHint").textContent = p.hint + (p.raw !== undefined
+    ? " 이 시나리오는 위 입력 칸으로 만들 수 없는 형태라서 '실제로 전송될 바이트'에 직접 작성되어 있습니다." : "");
+  const f = p.form || {};
+  $("method").value = f.method || "GET";
+  $("path").value = f.path || "/";
+  $("headers").value = f.headers || "";
+  $("body").value = f.body || "";
+  $("framing").value = f.framing || "length";
+  $("segment").value = String(p.segment || 0);
+  $("raw").value = p.raw !== undefined ? p.raw : buildRaw();
+  updateRawInfo();
+}
+
+function renderPresets() {
+  const box = $("presets");
+  for (const p of PRESETS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "preset";
+    b.dataset.id = p.id;
+    b.innerHTML = `<b></b><span></span>`;
+    b.querySelector("b").textContent = p.title;
+    b.querySelector("span").textContent = p.desc;
+    b.onclick = () => applyPreset(p);
+    box.appendChild(b);
+  }
+}
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function statusClass(s) { return "status s" + String(s || 0)[0]; }
+
+function eventCard(ev) {
+  const card = el("div", "event");
+  const top = el("div", "top");
+  top.appendChild(el("span", "line", `${ev.method || "?"} ${ev.uri || ""}`));
+  top.appendChild(el("span", statusClass(ev.status), ev.status ? String(ev.status) : "응답 없음"));
+  card.appendChild(top);
+
+  const dl = el("dl");
+  const add = (k, v) => { if (v === undefined || v === "") return; dl.appendChild(el("dt", "", k)); dl.appendChild(el("dd", "", String(v))); };
+  add("시각", ev.ts);
+  add("클라이언트", `${ev.client_ip}:${ev.client_port}`);
+  add("서버", `${ev.server_ip}:${ev.server_port}`);
+  add("Host", ev.host);
+  add("User-Agent", ev.user_agent);
+  add("요청 Content-Type", ev.req_content_type);
+  add("요청 본문", `${(ev.req_body_bytes || 0).toLocaleString()} 바이트`);
+  add("응답 Content-Type", ev.resp_content_type);
+  if (ev.resp_body_bytes !== undefined) add("응답 본문", `${ev.resp_body_bytes.toLocaleString()} 바이트`);
+  if (ev.response_delay_us !== undefined) add("응답 지연", `${(ev.response_delay_us / 1000).toFixed(2)} ms`);
+  card.appendChild(dl);
+
+  if (ev.flags) {
+    const fl = el("div", "flags");
+    for (const f of ev.flags.split(",")) {
+      const [text, severe] = FLAG_INFO[f] || ["", false];
+      const row = el("div", "flag" + (severe ? " bad" : ""));
+      row.appendChild(el("code", "", f));
+      if (text) row.appendChild(document.createTextNode(" · " + text));
+      fl.appendChild(row);
+    }
+    card.appendChild(fl);
+  }
+  return card;
+}
+
+function renderResult() {
+  const box = $("result");
+  box.replaceChildren();
+  if (!current) { box.appendChild(el("div", "empty", "아직 보낸 요청이 없습니다.")); return; }
+  const mine = allEvents.filter((e) => e.client_port === current.port);
+  const waited = Date.now() - current.sentAt;
+
+  const info = el("div", "meta", `이번 요청: 클라이언트 포트 ${current.port} · ${current.segments}개 세그먼트로 ${current.sent.toLocaleString()} 바이트 전송`);
+  info.style.marginBottom = "10px";
+  box.appendChild(info);
+
+  if (mine.length === 0) {
+    if (waited < 4000) {
+      const w = el("div", "waiting");
+      w.appendChild(el("div", "spin"));
+      w.appendChild(document.createTextNode("에이전트가 패킷을 분석하는 중..."));
+      box.appendChild(w);
+    } else {
+      const msg = current.expectHttp
+        ? "에이전트가 이 연결에서 HTTP 이벤트를 기록하지 않았습니다. 요청 형식을 확인해 보세요."
+        : "기록된 이벤트가 없습니다. HTTP가 아닌 연결로 판별되어 무시되었습니다. (정상 동작)";
+      box.appendChild(el("div", current.expectHttp ? "match no" : "match ok", msg));
+    }
+    return;
+  }
+
+  if (current.bodyBytes !== null && mine.length === 1 && mine[0].resp_body_bytes !== undefined) {
+    const cmp = el("div", "compare");
+    const a = el("div"); a.appendChild(el("b", "", current.bodyBytes.toLocaleString())); a.appendChild(el("span", "", "클라이언트가 받은 응답 본문 (바이트)"));
+    const b = el("div"); b.appendChild(el("b", "", mine[0].resp_body_bytes.toLocaleString())); b.appendChild(el("span", "", "에이전트가 패킷에서 계산한 값"));
+    cmp.append(a, b);
+    box.appendChild(cmp);
+    const same = current.bodyBytes === mine[0].resp_body_bytes;
+    box.appendChild(el("div", same ? "match ok" : "match no",
+      same ? "일치합니다. 패킷을 이어 붙여 응답 전체를 정확히 복원했습니다." : "값이 다릅니다. (chunked 응답은 조각 헤더를 뺀 길이라 다를 수 있습니다)"));
+  } else {
+    box.appendChild(el("div", "match ok", `이 연결에서 HTTP 이벤트 ${mine.length}건을 기록했습니다.`));
+  }
+  for (const ev of mine) box.appendChild(eventCard(ev));
+}
+
+// Body length the client received, to compare with the agent's count. For chunked
+// responses the chunk framing is removed, because the agent counts payload bytes only.
+function clientBodyBytes(j) {
+  if (j.header_bytes < 0) return null;
+  const text = j.response_text;
+  const head = text.slice(0, text.indexOf("\r\n\r\n")).toLowerCase();
+  if (!/transfer-encoding:\s*chunked/.test(head)) return j.response_bytes - j.header_bytes;
+  if (j.response_truncated) return null;
+  let total = 0;
+  const bytes = enc.encode(text.slice(text.indexOf("\r\n\r\n") + 4));
+  let pos = 0;
+  const dec = new TextDecoder();
+  while (pos < bytes.length) {
+    let nl = bytes.indexOf(10, pos);
+    if (nl < 0) return null;
+    const size = parseInt(dec.decode(bytes.slice(pos, nl)).split(";")[0].trim(), 16);
+    if (isNaN(size)) return null;
+    if (size === 0) break;
+    total += size;
+    pos = nl + 1 + size + 2;
+  }
+  return total;
+}
+
+function renderLog() {
+  const tb = $("log");
+  tb.replaceChildren();
+  $("count").textContent = allEvents.length ? `(${allEvents.length}건)` : "";
+  if (!allEvents.length) {
+    const tr = el("tr"); const td = el("td", "empty", "이벤트가 없습니다."); td.colSpan = 7; tr.appendChild(td); tb.appendChild(tr);
+    return;
+  }
+  for (const ev of [...allEvents].reverse().slice(0, 200)) {
+    const tr = el("tr", current && ev.client_port === current.port ? "mine" : "");
+    tr.appendChild(el("td", "", (ev.ts || "").slice(11, 23)));
+    tr.appendChild(el("td", "num", String(ev.client_port)));
+    tr.appendChild(el("td", "mono", ev.method || ""));
+    const u = el("td", "uri mono", ev.uri || ""); u.title = ev.uri || ""; tr.appendChild(u);
+    const st = el("td", "num"); st.appendChild(el("span", statusClass(ev.status), String(ev.status || "-"))); tr.appendChild(st);
+    tr.appendChild(el("td", "num", ev.resp_body_bytes !== undefined ? ev.resp_body_bytes.toLocaleString() : "-"));
+    tr.appendChild(el("td", "", ev.flags || ""));
+    tr.onclick = () => { const d = $("detail"); d.style.display = "block"; d.textContent = JSON.stringify(ev, null, 2); };
+    tb.appendChild(tr);
+  }
+}
+
+async function poll() {
+  try {
+    const r = await fetch(`/api/events?after=${nextIndex}`, { cache: "no-store" });
+    const j = await r.json();
+    if (j.events.length) { allEvents.push(...j.events); renderLog(); }
+    nextIndex = j.next;
+    const pill = $("agent");
+    pill.className = "pill" + (j.agent_running ? " on" : "");
+    pill.textContent = j.agent_running ? "에이전트 캡처 중 (lo, tcp port 8080)" : "에이전트가 실행 중이 아님";
+  } catch (e) {
+    $("agent").className = "pill";
+    $("agent").textContent = "데모 서버에 연결할 수 없음";
+  }
+  if (current) renderResult();
+}
+
+async function send() {
+  const raw = toCrlf($("raw").value);
+  if (!raw.trim()) return;
+  const btn = $("send");
+  btn.disabled = true;
+  $("sendInfo").textContent = "전송 중...";
+  try {
+    const r = await fetch("/api/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ raw, segment_size: Number($("segment").value), delay_ms: Number($("delay").value) || 0 }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    current = {
+      port: j.client_port, sentAt: Date.now(), segments: j.segments, sent: j.sent_bytes,
+      expectHttp: !(activePreset && activePreset.id === "nonhttp" && $("raw").value === activePreset.raw),
+      bodyBytes: clientBodyBytes(j),
+    };
+    $("sendInfo").textContent = `완료 · ${j.elapsed_ms} ms`;
+    $("responseMeta").textContent = `${j.response_bytes.toLocaleString()} 바이트 수신` +
+      (j.response_truncated ? " (앞 16KB만 표시)" : "") + (j.timed_out ? " · 응답 대기 시간 초과" : "");
+    $("response").textContent = j.response_text || "(응답 없음)";
+    renderResult();
+    renderLog();
+  } catch (e) {
+    $("sendInfo").textContent = "실패: " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+renderPresets();
+applyPreset(PRESETS[0]);
+["method", "path", "headers", "body", "framing"].forEach((id) => $(id).addEventListener("input", regen));
+$("raw").addEventListener("input", updateRawInfo);
+$("segment").addEventListener("change", updateRawInfo);
+$("regen").onclick = regen;
+$("send").onclick = send;
+poll();
+setInterval(poll, 700);
+</script>
+</body>
+</html>

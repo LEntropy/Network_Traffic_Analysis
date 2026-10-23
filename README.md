@@ -56,6 +56,30 @@ netaudit-agent -i eth0 -f "tcp" -o /var/log/netaudit.jsonl
 {"type":"stats","packets":33,"tcp_segments":33,"flows":3,"delivered_bytes":1229,"retransmitted_bytes":0,"out_of_order_segments":0,"gap_events":0,"events":3}
 ```
 
+## 직접 테스트해 보기 (웹 테스트 클라이언트)
+
+브라우저에서 요청을 만들어 보내면, 에이전트가 같은 트래픽을 패킷으로 캡처해 분석한 결과를 바로 옆에 보여줍니다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run_demo.ps1
+```
+
+브라우저에서 http://localhost:8000 이 열립니다. 하나의 컨테이너 안에서 세 프로세스가 함께 돕니다.
+
+```
+ 브라우저 ──► ui_server.py (:8000) ──raw TCP──► target_server.py (127.0.0.1:8080)
+                   ▲                                   │ loopback
+                   └── /tmp/events.jsonl ◄── netaudit-agent -i lo -f "tcp port 8080"
+```
+
+- **시나리오 13개**: 기본 GET, 256KB 응답, chunked 응답/업로드, 404, HEAD, 한글 POST, 파이프라이닝, 1바이트씩 전송, 스머글링(CL+TE, CL 중복), WebSocket 업그레이드, HTTP가 아닌 데이터
+- **요청 편집**: 메서드, 경로, 헤더, 본문을 입력하거나 전송할 바이트를 직접 고칠 수 있습니다.
+- **전송 방식**: TCP 세그먼트 크기(1/5/16/64바이트)와 세그먼트 간격을 정할 수 있어서, 패킷이 잘게 쪼개져도 재조립되는지 볼 수 있습니다.
+- **결과 비교**: 클라이언트가 받은 응답 본문 크기와 에이전트가 패킷에서 계산한 값을 나란히 보여주고, 플래그마다 의미를 설명합니다.
+- **실시간 이벤트 로그**: 모든 이벤트를 표로 보여주고, 행을 클릭하면 원본 JSON을 볼 수 있습니다.
+
+UI가 요청을 보낼 수 있는 곳은 컨테이너 안의 테스트 서버(127.0.0.1:8080)로 고정되어 있고, 포트는 호스트의 127.0.0.1에만 열립니다.
+
 ## 테스트 실행과 보고서
 
 Windows에서는 Docker Desktop만 켜져 있으면 아래 명령 하나로 전체 테스트가 돌아갑니다.
